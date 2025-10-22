@@ -4,5 +4,9 @@ numpy>=1.25.0,<2.0.0
 google-genai>=1.46.0
 python-dotenv>=1.1.1
 sqlparse>=0.5.3
-streamlit>=1.32.2
+streamlit>=1.50.0
 pandas>=2.3.0
+torch>=2.1.0    # I am using PyTorch backend
+huggingface_hub>=0.17.2
+
+datasets==2.15.0        #  loading datasets
