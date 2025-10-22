@@ -6,25 +6,27 @@ Amaç, LLM’lerin SQL oluştururken sıklıkla yaşadığı tablo veya sütun i
 
 Kullanıcı doğal dilde bir sorgu (örneğin “1000’den büyük nüfusa sahip şehirlerin isimlerini getir”) girdiğinde sistem, veritabanı şemasını içeren CREATE TABLE ifadeleri arasından en ilgili olanları bulur, bu bilgileri bağlam olarak LLM’e iletir ve doğru SQL sorgusunu oluşturur.
  
- Kullanıcı sorusu:
-1. Vektör arama ile en ilgili örnek/şema parçalarını getirir,
-2. LLM (Google Gemini) ile bu bağlamı kullanıp final SQL'i üretir,
-3. Üretilen SQL'i doğrular (format, güvenlik kuralları).
+Çalışma Adımları:
+
+1.Vektör Arama (Retriever)
+-Kullanıcı sorusu embedding’e dönüştürülür
+-FAISS vektör veritabanında benzer şema parçaları aranır
+-En ilgili k parça geri döner
+
+2.SQL Üretimi (Generator)
+-Toplanan context parçaları, prompt template içine yerleştirilir
+-Google Gemini kullanılarak final SQL sorgusu oluşturulur
+
+3.Doğrulama
+-Üretilen SQL, sqlparse ve güvenlik filtreleri ile kontrol edilir (SELECT-only, DROP/DELETE gibi tehlikeli ifadeler engellenir) 
 
 ## Veri Seti
 - Kullanılan veri seti: Bu projede kullanılan veri seti, WikiSQL ve Spider veri kümelerinden türetilmiş birleştirilmiş ve temizlenmiş bir versiyondur.
-- Veri seti Hugging Face üzerinde çekilmiştir ve LLM tabanlı text-to-SQL modellerinin hallucination hatalarını azaltmayı hedefler. Hazır SQL/CREATE-QUESTION-ANSWER veri kümesidir
-- @misc{b-mc2_2023_sql-create-context,
+- Veri seti Hugging Face üzerinde çekilmiştir ve LLM tabanlı text-to-SQL modellerinin hallucination hatalarını azaltmayı hedefler.Hazır SQL/CREATE-QUESTION-ANSWER veri kümesidir
 
-title   = {sql-create-context Dataset},
+- Kaynak : @misc{b-mc2_2023_sql-create-context, title   = {sql-create-context Dataset},
+author  = {b-mc2}, year    = {2023}, url     = https://huggingface.co/datasets/b-mc2/sql-create-context , note    = {This dataset was created by modifying data from the following sources: \cite{zhongSeq2SQL2017, yu2018spider}.},}.
 
-author  = {b-mc2}, 
-  
-  year    = {2023},
-  
-  url     = https://huggingface.co/datasets/b-mc2/sql-create-context
-  
-  note    = {This dataset was created by modifying data from the following sources: \cite{zhongSeq2SQL2017, yu2018spider}.},}.
 - Veri işleme adımları parçalara bölme (chunking), schema+question birleşimi, örnek SQL saklamadan oluşur.
   
 - Veri Setinin Özellikleri:
@@ -35,15 +37,17 @@ Bu, LLM’lerin şema bilgisine dayalı SQL üretme becerilerini ölçmek için 
 
 ## Çözüm Mimarisi
 1️. Veri Alma 
-
-Kaynak dosyalar: SQL şemaları (CREATE TABLE ifadeleri)
-Her dosya okunur, gereksiz karakterlerden temizlenir ve küçük parçalara (chunks) bölünür.
-
+-Veri Alma ve Temizleme (load_data.py)
+-JSON formatındaki veri yüklenir
+-Eksik veya hatalı alanlar çıkarılır
+-Küçük parçalara (chunks) bölünür
+- Chunk: Context + Question birleşimi + doğru SQL (answer)
 2️. Embedding 
+Her chunk, SentenceTransformer modeli ile embedding’e dönüştürülür
 
-Her chunk, SentenceTransformer modeli ile embedding’e dönüştürülür.
-Bu embedding’ler, sorguların anlam bazlı benzerliğini ölçmekte kullanılır.
+FAISS vektör veritabanında saklanır
 
+Kullanıcının sorgusu da embedding’e dönüştürülerek top-k benzer context bulunur
 (OpenAI embedding modeli kullanılmadı, yalnızca SentenceTransformer tercih edildi.)
 
 3. Vektör Veritabanı (Vector DB)
@@ -53,8 +57,9 @@ Kullanıcının sorgusu embedding’e dönüştürülür ve en benzer k parçala
 
 4. Retriever Katmanı
 
-FAISS içinden gelen en benzer context parçaları alınır.
-Bu parçalar, bağlamsal yanıt oluşturmak için birleştirilir.
+FAISS üzerinden top-k en yakın chunk’lar alınır
+
+Semantic similarity ile sıralama yapılı
 
 5.  Context Birleştirme (Context Assembly)
 
@@ -64,22 +69,26 @@ Böylece model, yalnızca ilgili tablo/sütun isimlerini kullanarak SQL üretir.
 6. Yanıt Üretimi (Generator)
 
 Gemini API (Google Generative AI) kullanılarak son yanıt üretilir.
+
 Yanıtlar genellikle SQL sorgusu formatında döndürülür.
 
 7️. Web Arayüzü (UI)
 
 Web arayüzü Streamlit ile geliştirilmiştir.
+
 Kullanıcı doğal dil sorgusunu girer → model yanıt üretir → yanıt ve kullanılan kaynaklar (ör. tablo adı, chunk id) arayüzde gösterilir.
 
 ## Kullanılan Yöntemler / Teknolojiler
-- Embedding: sentence-transformers (all-MiniLM-L6-v2)
+- Embedding: sentence-transformers (all-mpnet-base-v2)
 - Vektör DB: FAISS (IndexFlatIP + L2-normalize)
 - RAG Pipeline: Basit retrieval -> generate akışı (Retriever + SQLGenerator)
 - Generation: Google Gemini (google-generativeai)
 - Validation: sqlparse tabanlı format + güvenlik filtreleri (SELECT-only/forbidden list)
 - Web UI: Streamlit (app.py)
+- Python Packages: numpy, faiss, pickle, sqlparse, sentence_transformers, dotenv
 
 ## Kurulum (Windows, venv)
+git clone (https://github.com/Rana-Irem-Turhan/iremrit-s_rag_chatbot.git)
 1. Repo klonla ve venv oluştur:
    - python -m venv venv_rag
    - .\venv_rag\Scripts\activate
@@ -98,12 +107,11 @@ Kullanıcı doğal dil sorgusunu girer → model yanıt üretir → yanıt ve ku
 
 ## Nasıl Çalıştırılır (Local)
 - Konsoldan etkileşimli retrieval:
-  - python retrieve.py  # interactive mode
-  - veya komut satırı: python retrieve.py -q "How to find employees with salary above average?" -k 3
+  - python app.py
+  - python app.py --streamlit
+
 - Streamlit web arayüzü:
   - streamlit run app.py
-  - Tarayıcıda http://localhost:**** açılacak
-
 
 Deploy link: https://huggingface.co/spaces/iremrit/iremrit-s_rag_chatbot_gemini
 
@@ -118,8 +126,15 @@ Deploy link: https://huggingface.co/spaces/iremrit/iremrit-s_rag_chatbot_gemini
 - README.md, requirements.txt, .env.example
 
 ## Örnek Kullanım
-  - streamlit run app.py
-- API (isteğe bağlı): FastAPI backend oluşturup Bubble/Retool/Frontend ile entegre edebilirsiniz.
+  Kullanıcı sorusu: "Çalışanların maaşları ortalamanın üzerinde olanları getir"
+
+Sistem:
+
+En uygun schema chunk’ları getirir
+
+Gemini ile SQL üretir
+
+SQL doğrulama yapar ve Streamlit’te gösterir
 
 ## Sonuçlar / Beklenen Çıktı
 - Doğru yapılandırıldığında model soruya bağlı, bağlama uygun ve valid SQL üretir. 
@@ -130,7 +145,13 @@ Deploy link: https://huggingface.co/spaces/iremrit/iremrit-s_rag_chatbot_gemini
 - Unit testler (pytest) ve CI pipeline
 - UI: daha interaktif Streamlit bileşenleri veya Bubble entegrasyonu (backend API ile)
 
+## Özet
 
+Bu proje, LLM’lerin SQL hallucination problemini azaltan, schema-temelli güvenli ve doğru SQL üreten bir RAG pipeline sunuyor.
+
+Hem CLI hem Streamlit web arayüzü ile test edilebilir.
+
+Veri seti, embeddings, FAISS, Retriever ve Gemini entegrasyonu bir araya gelerek, doğal dilden SQL’e güvenilir bir yol sağlıyor.
 
 Hazırlayan: RANA IREM TURHAN  
 
