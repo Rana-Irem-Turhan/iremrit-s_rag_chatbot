@@ -114,6 +114,7 @@ git clone (https://github.com/Rana-Irem-Turhan/iremrit-s_rag_chatbot.git)
   - streamlit run app.py
 
 Deploy link: https://huggingface.co/spaces/iremrit/iremrit-s_rag_chatbot_gemini
+<img width="920" height="562" alt="image" src="https://github.com/user-attachments/assets/3cfaaa6c-8b34-424b-879b-c682f4f4476f" />
 
 
 ## Proje Yapısı (özet)
