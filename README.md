@@ -13,16 +13,21 @@ Kullanıcı doğal dilde bir sorgu (örneğin “1000’den büyük nüfusa sahi
 
 ## Veri Seti
 - Kullanılan veri seti: Bu projede kullanılan veri seti, WikiSQL ve Spider veri kümelerinden türetilmiş birleştirilmiş ve temizlenmiş bir versiyondur.
-Veri seti Hugging Face üzerinde çekilmiştir ve LLM tabanlı text-to-SQL modellerinin hallucination hatalarını azaltmayı hedefler. Hazır SQL/CREATE-QUESTION-ANSWER veri kümesidir (@misc{b-mc2_2023_sql-create-context,
-  title   = {sql-create-context Dataset},
-  author  = {b-mc2}, 
-  year    = {2023},
-  url     = https://huggingface.co/datasets/b-mc2/sql-create-context
-  note    = {This dataset was created by modifying data from the following sources: \cite{zhongSeq2SQL2017, yu2018spider}.},
-}).
-- Veri işleme adımları: parçalara bölme (chunking), schema+question birleşimi, örnek SQL saklama.
-- Veri Seti Özellikleri:
+- Veri seti Hugging Face üzerinde çekilmiştir ve LLM tabanlı text-to-SQL modellerinin hallucination hatalarını azaltmayı hedefler. Hazır SQL/CREATE-QUESTION-ANSWER veri kümesidir
+- @misc{b-mc2_2023_sql-create-context,
 
+title   = {sql-create-context Dataset},
+
+author  = {b-mc2}, 
+  
+  year    = {2023},
+  
+  url     = https://huggingface.co/datasets/b-mc2/sql-create-context
+  
+  note    = {This dataset was created by modifying data from the following sources: \cite{zhongSeq2SQL2017, yu2018spider}.},}.
+- Veri işleme adımları parçalara bölme (chunking), schema+question birleşimi, örnek SQL saklamadan oluşur.
+  
+- Veri Setinin Özellikleri:
 1. Toplam 78,577 örnek (Doğal dil sorguları /İlgili CREATE TABLE ifadeleri/ Sorgunun doğru SQL çıktısı)
 2. Her örnekte, kullanıcı sorusu (question), tablo şeması (context), ve doğru sorgu (answer) alanları yer alır.
 3. Gerçek veri satırları (rows) yerine yalnızca şema bilgileri (CREATE TABLE) kullanılır.
@@ -30,32 +35,39 @@ Bu, LLM’lerin şema bilgisine dayalı SQL üretme becerilerini ölçmek için 
 
 ## Çözüm Mimarisi
 1️. Veri Alma 
+
 Kaynak dosyalar: SQL şemaları (CREATE TABLE ifadeleri)
 Her dosya okunur, gereksiz karakterlerden temizlenir ve küçük parçalara (chunks) bölünür.
 
 2️. Embedding 
+
 Her chunk, SentenceTransformer modeli ile embedding’e dönüştürülür.
 Bu embedding’ler, sorguların anlam bazlı benzerliğini ölçmekte kullanılır.
 
 (OpenAI embedding modeli kullanılmadı, yalnızca SentenceTransformer tercih edildi.)
 
 3. Vektör Veritabanı (Vector DB)
+
 Embedding’ler FAISS vektör veritabanında saklanır.
 Kullanıcının sorgusu embedding’e dönüştürülür ve en benzer k parçalar (top_k) geri getirilir.
 
 4. Retriever Katmanı
+
 FAISS içinden gelen en benzer context parçaları alınır.
 Bu parçalar, bağlamsal yanıt oluşturmak için birleştirilir.
 
 5.  Context Birleştirme (Context Assembly)
+
 Elde edilen şemalar, prompt template içinde birleştirilerek LLM modeline gönderilir.
 Böylece model, yalnızca ilgili tablo/sütun isimlerini kullanarak SQL üretir.
 
 6. Yanıt Üretimi (Generator)
+
 Gemini API (Google Generative AI) kullanılarak son yanıt üretilir.
 Yanıtlar genellikle SQL sorgusu formatında döndürülür.
 
 7️. Web Arayüzü (UI)
+
 Web arayüzü Streamlit ile geliştirilmiştir.
 Kullanıcı doğal dil sorgusunu girer → model yanıt üretir → yanıt ve kullanılan kaynaklar (ör. tablo adı, chunk id) arayüzde gösterilir.
 
@@ -90,7 +102,7 @@ Kullanıcı doğal dil sorgusunu girer → model yanıt üretir → yanıt ve ku
   - veya komut satırı: python retrieve.py -q "How to find employees with salary above average?" -k 3
 - Streamlit web arayüzü:
   - streamlit run app.py
-  - Tarayıcıda http://localhost:8501 açılacak
+  - Tarayıcıda http://localhost:**** açılacak
 
 
 Deploy link: https://huggingface.co/spaces/iremrit/iremrit-s_rag_chatbot_gemini
