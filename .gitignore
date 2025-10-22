@@ -1,0 +1,53 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environment
+.venv/
+venv/
+venv_rag/
+
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm settings
+.idea/
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Python package distribution
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Project specific
+embeddings.faiss
+chunks.pkl
+processed_chunks.json
+
+# OS specific
+.DS_Store
+Thumbs.db

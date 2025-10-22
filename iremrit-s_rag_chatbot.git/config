@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/Rana-Irem-Turhan/iremrit-s_rag_chatbot.git
+	tagOpt = --no-tags
+	fetch = +refs/*:refs/*
+	mirror = true
