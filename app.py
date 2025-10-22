@@ -14,23 +14,23 @@ from sentence_transformers import SentenceTransformer
 import streamlit as st
 from dotenv import load_dotenv
 
-"""Load environment variables (API KEYS etc.)
-I use dotenv so I can keep my Gemini API key private and not hard-coded."""
+# Load environment variables (API KEYS etc.)
+# I use dotenv so I can keep my Gemini API key private and not hard-coded.
 
 load_dotenv()
 
 # ===== validate.py =====
-""" A small helper section for SQL validation.
-Prevents any destructive queries (like DROP, DELETE) from being executed accidentally."""
+# A small helper section for SQL validation.
+#Prevents any destructive queries (like DROP, DELETE) from being executed accidentally.
 _FORBIDDEN = re.compile(
     r'\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE|EXEC|MERGE)\b',
     re.IGNORECASE
 )
    
-    """
-    Checking if the SQL is safe and syntactically valid.
-    Returns (is_valid, message, formatted_sql)
-    """
+
+# Checking if the SQL is safe and syntactically valid.
+# Returns (is_valid, message, formatted_sql)
+
 def validate_sql(query: str) -> Tuple[bool, str, str]:
     if not query or not query.strip():
         return False, "Empty query", ""
@@ -47,8 +47,8 @@ def validate_sql(query: str) -> Tuple[bool, str, str]:
 
 
 # ===== generate.py =====
-""" This section I created to handle communication with the Gemini API (if available ofc.)
- and constructs the prompt for SQL generation accordingly."""
+# This section I created to handle communication with the Gemini API (if available ofc.)
+ # and constructs the prompt for SQL generation accordingly.
 try:
     from google import genai
     from google.genai import types 
@@ -153,7 +153,7 @@ def ask_gemini(prompt: str) -> str:
 
 
 # ===== retrieve.py =====
-""" The retriever part where the chatbot finds the most relevant schema chunks based on user question."""
+# The retriever part where the chatbot finds the most relevant schema chunks based on user question.
 
 class Retriever:
     """This class is for fetching top-k schema chunks and then generates SQL."""
@@ -203,63 +203,69 @@ class Retriever:
 
 
 # ===== CLI / main =====
-""" I included a simple command-line interface for local testing
- — helps verify retriever and SQL generation logic before using Streamlit."""
+# I included a simple command-line interface for local testing
+# — helps verify retriever and SQL generation logic before using Streamlit.
 
 def main():
     retriever = Retriever()
-    print("Welcome! Choose mode:\n1. Retriever-only\n2. RAG Gemini Chatbot")
-    mode = input("Enter 1 or 2: ").strip()
-    if mode not in ["1", "2"]:
-        mode = "2"
-    print("\nType 'exit' or 'quit' to stop\n")
-    k = 3
-    while True:
-        query = input("You: ").strip()
-        if query.lower() in ["exit", "quit"]:
-            break
-        if not query:
-            continue
+    st.set_page_config(page_title="RAG Gemini Chatbot", layout="wide")
+    st.title("RAGent")
+    st.write("Welcome! Choose your mode:")
+    # Mode selection happening
 
-        #Changing k on the go
+    mode = st.radio("Select mode:", ("Retriever-only", "RAG Gemini Chatbot"))
+    st.write("Type 'exit' in the query box to stop the session.")
+
+    # Number of results k can be changed
+    k = st.number_input("Number of results (k):", min_value=1, value=3, step=1)
+
+    # User quetion input
+    query = st.text_input("Enter your question here:")
+
+    if query:
+        if query.lower() in ["exit", "quit"]:
+            st.stop()  # stops execution for this run
+
+
         if query.startswith("k="):
             try:
                 k = int(query[2:])
-                print(f"Number of results set to {k}")
-                continue
+                st.success(f"Number of results set to {k}")
+
             except ValueError:
-                continue
+                st.error("Invalid number for k")
 
-        if mode == "1":
-            # Retriever-only mode:  which just shows retrieved contexts and example SQL
-            results = retriever.get_relevant_chunks(query, k=k)
-            print(f"\nQuery: {query}\n")
-            for r in results:
-                chunk = r['chunk']
-                print(f"Rank {r['rank']} | score={r['score']:.4f}")
-                print(f"Schema: {chunk.get('text')}")
-                print(f"SQL: {chunk.get('answer')}\n")
         else:
-            # Full RAG pipeline mode on: context retrieval + Gemini SQL generation
-            response_data = retriever.get_response(query, k=k)
-            generated_sql = response_data.get("generated_sql", "[No SQL generated]")
-            contexts = response_data.get("contexts", [])
-            top_chunks_text = [c['chunk']['text'] for c in contexts]
-            context_text = "\n".join(top_chunks_text)
-            # Asking Gemini for a natural language answer too
-            gemini_answer = ask_gemini(f"Use the following context to answer the question:\n{context_text}\nQuestion: {query}")
-            print("\n" + "-" * 50)
-            print("Gemini:", gemini_answer)
-            print("Generated SQL:", generated_sql)
-            print("-" * 50 + "\n")
+            if mode == "Retriever-only":
+                results = retriever.get_relevant_chunks(query, k=k)
+                st.subheader(f"Query: {query}")
+                for r in results:
+                    chunk = r['chunk']
+                    st.write(f"**Rank {r['rank']} | score={r['score']:.4f}**")
+                    st.write(f"Schema: {chunk.get('text')}")
+                    st.write(f"SQL: {chunk.get('answer')}\n")
+            else:
+                response_data = retriever.get_response(query, k=k)
+                generated_sql = response_data.get("generated_sql", "[No SQL generated]")
+                contexts = response_data.get("contexts", [])
+                top_chunks_text = [c['chunk']['text'] for c in contexts]
+                context_text = "\n".join(top_chunks_text)
+                gemini_answer = ask_gemini(
+                    f"Use the following context to answer the question:\n{context_text}\nQuestion: {query}"
+                )
+                st.write("---")
+                st.write("**Gemini:**", gemini_answer)
+                st.write("**Generated SQL:**", generated_sql)
+                st.write("---")
+# 1. Retriever-only mode:  which just shows retrieved contexts and example SQL
+# 2. Full RAG pipeline mode on: context retrieval + Gemini SQL generation
+# 3. Asking Gemini for a natural language answer too
 
 
-# ===== Streamlit App =====
-""" A friendly UI so others can interact with the chatbot visually.
-Note-> to myslef-> this part i will imporve def"""
+# ===== UI Continue =====
+# A friendly UI so others can interact with the chatbot visually.
+# Note-> to myslef->  i will improve 
 def run_streamlit():
-    st.set_page_config(page_title="RAG Gemini Chatbot", layout="wide")
-    st.title("RAG Gemini Chatbot")
 
     st.markdown(
         "Enter a natural language question about your database, "
@@ -288,12 +294,12 @@ def run_streamlit():
         st.subheader("Gemini Answer")
         st.markdown(gemini_answer)
 
-""" 
-Finally we have come to the end of my Project thank you for your inspiring mentor tea-time & Webinars.
-Her sey icin tesekkur ederim. Ingilizce yazmayi aliskanlik haline getirmisim :)) . 
-Sizleri tanimak ve bu projede bulunmak ufkumu acti acikcasi en azindan ben oyle dusunuyorum.
-O nedenle Inshallah daha nicelerine diyorum. Gorusmek Uzere!!! 
-"""
+
+# Finally we have come to the end of my Project thank you for your inspiring mentor tea-time & Webinars.
+# Her sey icin tesekkur ederim. Ingilizce yazmayi aliskanlik haline getirmisim :)) . 
+# Sizleri tanimak ve bu projede bulunmak ufkumu acti acikcasi en azindan ben oyle dusunuyorum.
+# O nedenle Inshallah daha nicelerine diyorum. Gorusmek Uzere!!! 
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--streamlit":
         run_streamlit()
